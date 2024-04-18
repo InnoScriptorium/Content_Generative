@@ -76,12 +76,12 @@ function App() {
   <div className="container">
     <div className="row">
       <div className="col">
-        <button type="button" className="btn btn-outline-light me-2">
+        {/* <button type="button" className="btn btn-outline-light me-2">
           <FontAwesomeIcon icon={faPlusCircle} /> Add To Doc
         </button>
         <button type="button" className="btn btn-outline-light me-2">
           <FontAwesomeIcon icon={faArrowCircleDown} /> Download Doc
-        </button>
+        </button> */}
       </div>
     </div>
   </div>
