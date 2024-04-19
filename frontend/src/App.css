@@ -4,13 +4,29 @@
 
 
 .logo {
-  height: 50px;
+  height: 35px;
+  
+}
+
+.header-logo {
+  display: flex;
+  align-items: center;
+}
+
+.header-logo img {
+  margin-right: 10px; /* Adjust as needed */
 }
 
 .input-group {
-  max-width: 500px;
+  max-width: 1200px;
   margin: 0 auto;
+ height: 45px;
+ 
 }
+
+/* .form-control{
+  max-height: 500px;
+} */
 
 .footer {
   position: fixed;
@@ -18,6 +34,11 @@
   width: 100%;
 }
 
+.text-dark{
+  text-align: left;
+  white-space: pre-wrap !important;
+  font-size: medium;
+}
 
 
 
