@@ -13,9 +13,12 @@ import "./App.css";
 
 function App() {
   const [question, setQuestion] = useState("");
-  const [response, setResponse] = useState("");
+  const [responseArray, setResponseArray] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [sideResponse, setSideResponse] = useState("");
+
+  const [response, setResponse] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -23,10 +26,12 @@ function App() {
     setLoading(true);
 
     try {
-      const res = await axios.post("http://localhost:4000/getResponse", {
-        question,
+      const modifiedQuestion = question + " table of contents";
+      const res = await axios.post("http://localhost:3001/getResponse", {
+        question: modifiedQuestion,
       });
-      setResponse(res.data);
+      const responseArray = res.data.split("\n");
+      setResponseArray(responseArray);
     } catch (err) {
       if (err.response && err.response.data && err.response.data.error) {
         setError(err.response.data.error);
@@ -39,8 +44,22 @@ function App() {
     }
   };
 
+  const reGeneRes = async (question) => {
+    try {
+      const res = await axios.post("http://localhost:3001/getResponse", {
+        question,
+      });
+      setSideResponse(question);
+      setResponse(res.data);
+      
+    } catch (error) {
+      console.error("Error fetching response from server:", error);
+      setResponse("Error fetching response from server");
+      
+    }
+  };
   return (
-    <div className="App d-flex flex-column min-vh-100">
+    <div className="App d-flex flex-column min-vh-100 overflow-x-hidden">
       <header className="bg-dark text-white py-2">
         <div className="container">
           <div className="row align-items-center">
@@ -61,43 +80,58 @@ function App() {
         </div>
       </header>
 
-      <main className="flex-grow-1 py-5">
-        <div className="container">
-          <form onSubmit={handleSubmit} className="mb-3">
-            <div className="input-group">
-              <input
-                className="form-control"
-                type="text"
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                placeholder="Enter your prompt"
-                required
-              />
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={loading}
+      <main className="flex-grow-1 py-5 mx-2">
+        <div className="row">
+          <div className="col-4 min-vh-100">
+            <form onSubmit={handleSubmit} className="mb-3">
+              <div className="input-group">
+                <input
+                  className="form-control"
+                  type="text"
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  placeholder="Enter your prompt"
+                  required
+                />
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    "Loading..."
+                  ) : (
+                    <FontAwesomeIcon icon={faRightToBracket} />
+                  )}
+                </button>
+              </div>
+              <br />
+            </form>
+            {error && <p className="text-danger">{error}</p>}
+            {responseArray.map((item, index) => (
+              <div
+                key={index}
+                className="response-item"
+                onClick={() => reGeneRes(item)}
+                style={{ backgroundColor: item === sideResponse ? 'aqua' : '' }}
               >
-                {loading ? (
-                  "Loading..."
-                ) : (
-                  <FontAwesomeIcon icon={faRightToBracket} />
-                )}
-              </button>
-            </div><br/>
-           {/*  <FontAwesomeIcon
-              icon={faArrowAltCircleRight}
-              className="btn btn-primary button-wrapper float-end mt-3"
-              onClick={handleSubmit}
-            /> */}
-          </form>
-
-          {error && <p className="text-danger">{error}</p>}
-          {response && <pre className="text-dark">{response}</pre>}
+                <pre className="text-dark">{item}</pre>
+              </div>
+            ))}
+          </div>
+          <div className="col-8  min-vh-100 side-response">
+            <h3>{sideResponse}</h3>
+            <textarea
+              className="form-control"
+              readOnly
+              value={response}
+              rows={20} 
+            />
+          </div>
         </div>
       </main>
 
-      <footer className=" py-1">
+      {/*  <footer className=" py-1">
         <div className="container ">
         <FontAwesomeIcon
               icon={faArrowAltCircleRight}
@@ -105,7 +139,7 @@ function App() {
               onClick={handleSubmit}
             />
         </div>
-      </footer>
+      </footer> */}
       <footer className="bg-dark text-white py-3 mt-auto">
         <div className="container">
           <div className="row align-items-center">
@@ -123,7 +157,7 @@ function App() {
                   <i class="fa-brands fa-instagram"></i>
                 </span>
                 {/* Copyright text */}
-                <p className="mb-0 ms-3">
+                <p className="mb-0 ms-3 copyright-text">
                   Copyright &copy; {new Date().getFullYear()} ldtech All Rights
                   Reserved
                 </p>
@@ -153,5 +187,12 @@ export default App;
         </button>
         <button type="button" className="btn btn-outline-light me-2">
           <FontAwesomeIcon icon={faArrowCircleDown} /> Download Doc
-        </button> */
+        </button> 
+        
+        <FontAwesomeIcon
+              icon={faArrowAltCircleRight}
+              className="btn btn-primary button-wrapper float-end mt-3"
+              onClick={handleSubmit}
+            />
+        */
 }
