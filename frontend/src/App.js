@@ -44,18 +44,18 @@ function App() {
     }
   };
 
-  const reGeneRes = async (question) => {
+  const reGeneRes = async (question,para) => {
     try {
       const res = await axios.post("http://localhost:3001/getResponse", {
         question,
       });
-      setSideResponse(question);
+      setSideResponse(para);
       setResponse(res.data);
-      
+
     } catch (error) {
       console.error("Error fetching response from server:", error);
       setResponse("Error fetching response from server");
-      
+
     }
   };
   return (
@@ -112,12 +112,13 @@ function App() {
               <div
                 key={index}
                 className="response-item"
-                onClick={() => reGeneRes(item)}
+                onClick={() => reGeneRes(item.includes(question) ? item : item + ' to ' + question,item)}
                 style={{ backgroundColor: item === sideResponse ? 'aqua' : '' }}
               >
                 <pre className="text-dark">{item}</pre>
               </div>
             ))}
+
           </div>
           <div className="col-8  min-vh-100 side-response">
             <h3>{sideResponse}</h3>
@@ -125,7 +126,7 @@ function App() {
               className="form-control"
               readOnly
               value={response}
-              rows={20} 
+              rows={20}
             />
           </div>
         </div>
