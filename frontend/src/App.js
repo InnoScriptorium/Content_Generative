@@ -1,14 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowAltCircleRight } from "@fortawesome/free-solid-svg-icons";
-import {
-  faPlusCircle,
-  faArrowCircleDown,
-  faPrint,
-  faRightToBracket,
-} from "@fortawesome/free-solid-svg-icons";
-
+import { faRightToBracket } from "@fortawesome/free-solid-svg-icons";
 import "./App.css";
 
 function App() {
@@ -16,9 +9,8 @@ function App() {
   const [responseArray, setResponseArray] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [sideResponse, setSideResponse] = useState("");
-
-  const [response, setResponse] = useState("");
+  const [fullResponseArray, setFullResponseArray] = useState("");
+  const [fetching, setFetching] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -26,7 +18,7 @@ function App() {
     setLoading(true);
 
     try {
-      const modifiedQuestion = question + " table of contents";
+      const modifiedQuestion = question + " table of contents ";
       const res = await axios.post("http://localhost:3001/getResponse", {
         question: modifiedQuestion,
       });
@@ -44,20 +36,135 @@ function App() {
     }
   };
 
-  const reGeneRes = async (question,para) => {
+  const fullRes = async () => {
     try {
-      const res = await axios.post("http://localhost:3001/getResponse", {
-        question,
-      });
-      setSideResponse(para);
-      setResponse(res.data);
+      setFetching(true); 
+      let tempFullResponseArray = [];
 
+      for (const item of responseArray) {
+        const modifiedItem = item.includes(question) ? item : item + ' to ' + question;
+        const res = await axios.post("http://localhost:3001/getResponse", {
+          question: modifiedItem,
+        });
+        
+        const toBoldItalicText = (text) => {
+          const boldItalicCharacters = {
+            a: "𝗮",
+            b: "𝗯",
+            c: "𝗰",
+            d: "𝗱",
+            e: "𝗲",
+            f: "𝗳",
+            g: "𝗴",
+            h: "𝗵",
+            i: "𝗶",
+            j: "𝗷",
+            k: "𝗸",
+            l: "𝗹",
+            m: "𝗺",
+            n: "𝗻",
+            o: "𝗼",
+            p: "𝗽",
+            q: "𝗾",
+            r: "𝗿",
+            s: "𝘀",
+            t: "𝘁",
+            u: "𝘂",
+            v: "𝘃",
+            w: "𝘄",
+            x: "𝘅",
+            y: "𝘆",
+            z: "𝘇",
+            A: "𝗔",
+            B: "𝗕",
+            C: "𝗖",
+            D: "𝗗",
+            E: "𝗘",
+            F: "𝗙",
+            G: "𝗚",
+            H: "𝗛",
+            I: "𝗜",
+            J: "𝗝",
+            K: "𝗞",
+            L: "𝗟",
+            M: "𝗠",
+            N: "𝗡",
+            O: "𝗢",
+            P: "𝗣",
+            Q: "𝗤",
+            R: "𝗥",
+            S: "𝗦",
+            T: "𝗧",
+            U: "𝗨",
+            V: "𝗩",
+            W: "𝗪",
+            X: "𝗫",
+            Y: "𝗬",
+            Z: "𝗭",
+            " ": " ",
+          };
+
+          return [...text].map(char => boldItalicCharacters[char] || char).join('');
+        };
+
+        tempFullResponseArray.push({ item: toBoldItalicText(item), responseData: res.data });
+
+        setFullResponseArray(prevState => prevState + `${toBoldItalicText(item)}\n${res.data}\n\n`);
+      }
     } catch (error) {
-      console.error("Error fetching response from server:", error);
-      setResponse("Error fetching response from server");
-
+      console.error("Error fetching responses from server:", error);
+    } finally {
+      setFetching(false);
     }
   };
+
+  const addToDocument = async (question, responseArray, fullResponseArray) => {
+    try {
+      await axios.post('http://localhost:3001/addToDocument', { question, responseArray, fullResponseArray });
+      console.log('Content added to document successfully');
+    } catch (error) {
+      console.error('Error adding content to document:', error);
+    }
+  };
+
+  const fetchDocumentContent = async () => {
+    try {
+      const response = await axios.get('http://localhost:3001/getDocumentContent');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching document content:', error);
+      return null;
+    }
+  };
+
+  const saveDocument = async () => {
+    try {
+      await addToDocument(question, responseArray, fullResponseArray);
+
+      const documentContent = await fetchDocumentContent();
+      if (!documentContent) {
+        console.error('Document content not found.');
+        return;
+      }
+
+      const response = await axios.get('http://localhost:3001/generate-document', {
+        params: { documentContent },
+        responseType: 'blob'
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'document.docx';
+      document.body.appendChild(link);
+      link.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error generating or downloading document:', error);
+    }
+  };
+
   return (
     <div className="App d-flex flex-column min-vh-100 overflow-x-hidden">
       <header className="bg-dark text-white py-2">
@@ -112,52 +219,40 @@ function App() {
               <div
                 key={index}
                 className="response-item"
-                onClick={() => reGeneRes(item.includes(question) ? item : item + ' to ' + question,item)}
-                style={{ backgroundColor: item === sideResponse ? 'aqua' : '' }}
               >
-                <pre className="text-dark">{item}</pre>
+                <pre className="text-dark big-item">{item}</pre>
               </div>
             ))}
-
+            <button className="get" onClick={fullRes} disabled={fetching}>
+              {fetching ? "Getting..." : "Get"}
+            </button>
           </div>
           <div className="col-8  min-vh-100 side-response">
-            <h3>{sideResponse}</h3>
             <textarea
               className="form-control"
               readOnly
-              value={response}
+              value={fullResponseArray}
               rows={20}
             />
+            <button onClick={saveDocument}>Save the document</button>
           </div>
         </div>
       </main>
 
-      {/*  <footer className=" py-1">
-        <div className="container ">
-        <FontAwesomeIcon
-              icon={faArrowAltCircleRight}
-              className="btn btn-primary button-wrapper float-center mt-3"
-              onClick={handleSubmit}
-            />
-        </div>
-      </footer> */}
       <footer className="bg-dark text-white py-3 mt-auto">
         <div className="container">
           <div className="row align-items-center">
             <div className="col-md-6 text-md-start">
-              {/* Social media icons and copyright text */}
               <div className="d-inline-flex align-items-center">
-                {/* Social media icons */}
                 <span className="me-3">
-                  <i class="fa-brands fa-facebook"></i>
+                  <i className="fab fa-facebook"></i>
                 </span>
                 <span className="me-3">
-                  <i class="fa-brands fa-twitter"></i>
+                  <i className="fab fa-twitter"></i>
                 </span>
                 <span>
-                  <i class="fa-brands fa-instagram"></i>
+                  <i className="fab fa-instagram"></i>
                 </span>
-                {/* Copyright text */}
                 <p className="mb-0 ms-3 copyright-text">
                   Copyright &copy; {new Date().getFullYear()} ldtech All Rights
                   Reserved
@@ -165,13 +260,8 @@ function App() {
               </div>
             </div>
             <div className="col-md-6 text-md-end mt-3 mt-md-0">
-              {/* Print button */}
-              {/* <button className="btn btn-light me-3" onClick={() => window.print()}>
-        <i class="fa-solid fa-print"></i>
-        
-        </button> */}
               <span className="me-3">
-                <i class="fa-solid fa-print"></i>
+                <i className="fas fa-print"></i>
               </span>
             </div>
           </div>
@@ -182,18 +272,3 @@ function App() {
 }
 
 export default App;
-{
-  /* <button type="button" className="btn btn-outline-light me-2">
-          <FontAwesomeIcon icon={faPlusCircle} /> Add To Doc
-        </button>
-        <button type="button" className="btn btn-outline-light me-2">
-          <FontAwesomeIcon icon={faArrowCircleDown} /> Download Doc
-        </button> 
-        
-        <FontAwesomeIcon
-              icon={faArrowAltCircleRight}
-              className="btn btn-primary button-wrapper float-end mt-3"
-              onClick={handleSubmit}
-            />
-        */
-}
