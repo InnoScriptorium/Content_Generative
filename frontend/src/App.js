@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faRightToBracket } from "@fortawesome/free-solid-svg-icons";
+import { jsPDF } from "jspdf";
 import "./App.css";
 
 function App() {
@@ -9,8 +10,10 @@ function App() {
   const [responseArray, setResponseArray] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [fullResponseArray, setFullResponseArray] = useState("");
-  const [fetching, setFetching] = useState(false);
+  const [fullResponseArray, setFullResponseArray] = useState([]);
+  const [sideResponse, setSideResponse] = useState("");
+  const [tempFullResponseArray, setTempFullResponseArray] = useState([]);
+  const [response, setResponse] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -18,12 +21,37 @@ function App() {
     setLoading(true);
 
     try {
-      const modifiedQuestion = question + " table of contents ";
+      const modifiedQuestion = question + " table of  3 contents ";
       const res = await axios.post("http://localhost:3001/getResponse", {
         question: modifiedQuestion,
       });
       const responseArray = res.data.split("\n");
       setResponseArray(responseArray);
+
+      let tempResponses = [];
+
+      for (const item of responseArray) {
+        const modifiedItem = item.includes(question)
+          ? item
+          : item + " to " + question;
+        const res = await axios.post("http://localhost:3001/getResponse", {
+          question: modifiedItem,
+        });
+
+        tempResponses.push({ item: item, responseData: res.data });
+        if (tempResponses.length === 1) {
+          setResponse(res.data);
+          setSideResponse(item); // Set the sideResponse to highlight the first item
+        }
+
+        //setFullResponseArray((prevState) => [...prevState, `art ${item}\n${res.data}\n\n`]);
+        setFullResponseArray((prevState) => [
+          ...prevState,
+          { item: item, data: res.data },
+        ]);
+
+        setTempFullResponseArray(tempResponses);
+      }
     } catch (err) {
       if (err.response && err.response.data && err.response.data.error) {
         setError(err.response.data.error);
@@ -36,133 +64,109 @@ function App() {
     }
   };
 
-  const fullRes = async () => {
-    try {
-      setFetching(true); 
-      let tempFullResponseArray = [];
-
-      for (const item of responseArray) {
-        const modifiedItem = item.includes(question) ? item : item + ' to ' + question;
-        const res = await axios.post("http://localhost:3001/getResponse", {
-          question: modifiedItem,
-        });
-        
-        const toBoldItalicText = (text) => {
-          const boldItalicCharacters = {
-            a: "𝗮",
-            b: "𝗯",
-            c: "𝗰",
-            d: "𝗱",
-            e: "𝗲",
-            f: "𝗳",
-            g: "𝗴",
-            h: "𝗵",
-            i: "𝗶",
-            j: "𝗷",
-            k: "𝗸",
-            l: "𝗹",
-            m: "𝗺",
-            n: "𝗻",
-            o: "𝗼",
-            p: "𝗽",
-            q: "𝗾",
-            r: "𝗿",
-            s: "𝘀",
-            t: "𝘁",
-            u: "𝘂",
-            v: "𝘃",
-            w: "𝘄",
-            x: "𝘅",
-            y: "𝘆",
-            z: "𝘇",
-            A: "𝗔",
-            B: "𝗕",
-            C: "𝗖",
-            D: "𝗗",
-            E: "𝗘",
-            F: "𝗙",
-            G: "𝗚",
-            H: "𝗛",
-            I: "𝗜",
-            J: "𝗝",
-            K: "𝗞",
-            L: "𝗟",
-            M: "𝗠",
-            N: "𝗡",
-            O: "𝗢",
-            P: "𝗣",
-            Q: "𝗤",
-            R: "𝗥",
-            S: "𝗦",
-            T: "𝗧",
-            U: "𝗨",
-            V: "𝗩",
-            W: "𝗪",
-            X: "𝗫",
-            Y: "𝗬",
-            Z: "𝗭",
-            " ": " ",
-          };
-
-          return [...text].map(char => boldItalicCharacters[char] || char).join('');
-        };
-
-        tempFullResponseArray.push({ item: toBoldItalicText(item), responseData: res.data });
-
-        setFullResponseArray(prevState => prevState + `${toBoldItalicText(item)}\n${res.data}\n\n`);
-      }
-    } catch (error) {
-      console.error("Error fetching responses from server:", error);
-    } finally {
-      setFetching(false);
+  const reGeneRes = (item, index) => {
+    if (tempFullResponseArray[index]) {
+      setResponse(tempFullResponseArray[index].responseData);
+      setSideResponse(item); // Set the sideResponse to highlight the clicked item
+    } else {
+      console.log("Error: Index not found in tempFullResponseArray");
     }
   };
 
-  const addToDocument = async (question, responseArray, fullResponseArray) => {
-    try {
-      await axios.post('http://localhost:3001/addToDocument', { question, responseArray, fullResponseArray });
-      console.log('Content added to document successfully');
-    } catch (error) {
-      console.error('Error adding content to document:', error);
-    }
-  };
+  const pdfDownload = () => {
+    const doc = new jsPDF();
+    const pageHeight = doc.internal.pageSize.height;
+    const pageWidth = doc.internal.pageSize.width;
+    const margin = 10;
+    const maxLineWidth = pageWidth - 2 * margin; // Account for the left and right margins
+    const lineHeight = 7; // Reduced line height
+    const itemLineHeight = 8; // Slightly larger line height for the item
+    let yOffset = margin;
 
-  const fetchDocumentContent = async () => {
-    try {
-      const response = await axios.get('http://localhost:3001/getDocumentContent');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching document content:', error);
-      return null;
-    }
-  };
+    const processText = (text) => {
+      const lines = doc.splitTextToSize(text, maxLineWidth); // Split text into lines that fit within maxLineWidth
+      return lines;
+    };
 
-  const saveDocument = async () => {
-    try {
-      await addToDocument(question, responseArray, fullResponseArray);
+    // Add the heading
+    const modifiedQuestion = question.toUpperCase();
+    doc.setFontSize(20); // Make the heading larger
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(0, 128, 0); // Green color
+    const textWidth = doc.getTextWidth(modifiedQuestion);
+    const textX = (pageWidth - textWidth) / 2;
+    doc.text(modifiedQuestion, textX, yOffset);
+    yOffset += 3; // Move yOffset down by the height of the heading
 
-      const documentContent = await fetchDocumentContent();
-      if (!documentContent) {
-        console.error('Document content not found.');
-        return;
-      }
+    // Add a single bold horizontal line immediately after the heading
+    const lineStartX = margin;
+    const lineEndX = pageWidth - margin;
+    doc.setDrawColor(0, 0, 0); // Black color for line
+    doc.setLineWidth(1.5); // Set line width to make it bold
+    doc.line(lineStartX, yOffset, lineEndX, yOffset); // Draw the line
+    yOffset += 8; // Space after the line
 
-      const response = await axios.get('http://localhost:3001/generate-document', {
-        params: { documentContent },
-        responseType: 'blob'
+    // Add "Table Of Contents:" string
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(0, 0, 0); // Black color for text
+    doc.text("Table Of Contents:", margin, yOffset);
+    yOffset += lineHeight; // Adjust yOffset for the next content
+
+    // Reset font settings for the content
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "normal");
+
+    // First, add the contents of responseArray
+    responseArray.forEach((line) => {
+      const lines = processText(line);
+      lines.forEach((textLine) => {
+        if (yOffset + lineHeight > pageHeight - margin) {
+          // Check if we need to add a new page
+          doc.addPage();
+          yOffset = margin;
+        }
+        doc.text(textLine, margin, yOffset);
+        yOffset += lineHeight; // Increase the yOffset for the next line
+      });
+    });
+
+    // Add a small space before adding fullResponseArray contents
+    yOffset += lineHeight / 2; // Reduce space
+
+    // Then, add the contents of fullResponseArray
+    fullResponseArray.forEach((entry) => {
+      const { item, data } = entry;
+
+      // Process and add the item in bold
+      doc.setFont("helvetica", "bold");
+      const itemLines = processText(item);
+      itemLines.forEach((line) => {
+        if (yOffset + itemLineHeight > pageHeight - margin) {
+          // Check if we need to add a new page
+          doc.addPage();
+          yOffset = margin;
+        }
+        doc.text(line, margin, yOffset);
+        yOffset += itemLineHeight; // Increase the yOffset for the next line
       });
 
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'document.docx';
-      document.body.appendChild(link);
-      link.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(link);
-    } catch (error) {
-      console.error('Error generating or downloading document:', error);
-    }
+      // Process and add the data in normal font
+      doc.setFont("helvetica", "normal");
+      const dataLines = processText(data);
+      dataLines.forEach((line) => {
+        if (yOffset + lineHeight > pageHeight - margin) {
+          doc.addPage();
+          yOffset = margin;
+        }
+        doc.text(line, margin, yOffset);
+        yOffset += lineHeight;
+      });
+
+      yOffset += lineHeight / 2;
+    });
+
+    doc.save(`${modifiedQuestion}.pdf`);
   };
 
   return (
@@ -215,26 +219,57 @@ function App() {
               <br />
             </form>
             {error && <p className="text-danger">{error}</p>}
-            {responseArray.map((item, index) => (
+            {/* {responseArray.map((item, index) => (
               <div
                 key={index}
                 className="response-item"
+                onClick={() => reGeneRes(item, index)}
+                style={{ backgroundColor: item === sideResponse ? 'aqua' : '' }}
               >
-                <pre className="text-dark big-item">{item}</pre>
+                <pre 
+                  className="text-dark big-item"  
+                  style={{ backgroundColor: '#e5e5e5'}}>
+                  {item}
+                </pre>
               </div>
-            ))}
-            <button className="get" onClick={fullRes} disabled={fetching}>
-              {fetching ? "Getting..." : "Get"}
-            </button>
+            ))} */}
+            {responseArray.map((item, index) => {
+              const itemExists = tempFullResponseArray.some(
+                (responseItem) => responseItem.item === item
+              );
+              const backgroundColor = itemExists ? "#e5e5e5" : "red";
+
+              return (
+                <div
+                  key={index}
+                  className="response-item"
+                  onClick={() => reGeneRes(item, index)}
+                  style={{
+                    backgroundColor: item === sideResponse ? "aqua" : "",
+                  }}
+                >
+                  <pre
+                    className="text-dark big-item"
+                    style={{ backgroundColor: backgroundColor }}
+                  >
+                    {item}
+                  </pre>
+                </div>
+              );
+            })}
           </div>
-          <div className="col-8  min-vh-100 side-response">
+
+          <div className="col-8 min-vh-100 side-response">
+            <h3>{sideResponse}</h3>
             <textarea
               className="form-control"
               readOnly
-              value={fullResponseArray}
+              value={response}
               rows={20}
             />
-            <button onClick={saveDocument}>Save the document</button>
+            <button onClick={pdfDownload} className="btn btn-secondary mt-3">
+              Download PDF
+            </button>
           </div>
         </div>
       </main>
